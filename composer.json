@@ -13,5 +13,8 @@
             "email": "121625706@qq.com"
         }
     ],
-    "require": {}
+    "require": {
+        "workerman/mysql": "^1.0",
+        "workerman/crontab": "^1.0"
+    }
 }
