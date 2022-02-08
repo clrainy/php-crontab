@@ -306,7 +306,7 @@ class Cron
                     $endTime = microtime(true);
                     $this->dbPool[$this->worker->id]
                         ->update($this->table)->cols([
-                            'running_times' => $rs['running_times'] + 1,
+                            'running_times' => ++$rs['running_times'],
                             'last_running_time' => date('Y-m-d H:i:s', $time)
                         ])->where('id= :id')->bindValues(['id' => $rs['id']])->query();
 
