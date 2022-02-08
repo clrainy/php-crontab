@@ -1,20 +1,21 @@
 {
-    "name": "cdyun/php-crontab",
-    "description": "cron",
-    "license": "mit",
-    "autoload": {
-        "psr-4": {
-            "Cdyun\\PhpCrontab\\": "src/"
-        }
-    },
-    "authors": [
-        {
-            "name": "cdyun",
-            "email": "121625706@qq.com"
-        }
-    ],
-    "require": {
-        "workerman/mysql": "^1.0",
-        "workerman/crontab": "^1.0"
+  "name": "cdyun/php-crontab",
+  "description": "cron",
+  "license": "mit",
+  "autoload": {
+    "psr-4": {
+      "Cdyun\\PhpCrontab\\": "src/"
     }
+  },
+  "authors": [
+    {
+      "name": "cdyun",
+      "email": "121625706@qq.com"
+    }
+  ],
+  "require": {
+    "workerman/mysql": "^1.0",
+    "workerman/crontab": "^1.0",
+    "cdyun/php-http": "dev-master"
+  }
 }
