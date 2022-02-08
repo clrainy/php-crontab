@@ -7,6 +7,7 @@ namespace Cdyun\PhpCrontab;
 
 use Cdyun\PhpCrontab\Core\EnvService;
 use Cdyun\PhpCrontab\Core\ToolService;
+use Workerman\Connection\TcpConnection;
 use Workerman\Crontab\Crontab;
 use Workerman\MySQL\Connection;
 use Workerman\Worker;
@@ -104,6 +105,30 @@ class Cron
     }
 
     /**
+     * 设置数据库链接信息
+     * @param array $env
+     * @return $this
+     */
+    public function setDbConfig(array $env = [])
+    {
+        $config = [
+            'host' => $env['DB_HOST'],
+            'port' => $env['DB_PORT'],
+            'user' => $env['DB_USER'],
+            'password' => $env['DB_PWD'],
+            'db_name' => $env['DB_NAME'],
+        ];
+        $this->table = $env['CRON_TABLE'];
+        $this->record = $env['CRON_LOG'];
+        $this->dbConfig = array_merge($this->dbConfig, $config);
+        if ($this->dbConfig['prefix']) {
+            $this->table = $this->dbConfig['prefix'] . $this->table;
+            $this->record = $this->dbConfig['prefix'] . $this->record;
+        }
+        return $this;
+    }
+
+    /**
      * 初始化 worker
      * @param string $socketName
      * @param array $contextOption
@@ -146,28 +171,71 @@ class Cron
 
         return $this;
     }
+
     /**
-     * 设置数据库链接信息
-     * @param array $env
-     * @return $this
+     * 设置Worker收到reload信号后执行的回调
+     * @param Worker $worker
      */
-    public function setDbConfig(array $env = [])
+    public function onWorkerReload(Worker $worker)
     {
-        $config = [
-            'host' => $env['DB_HOST'],
-            'port' => $env['DB_PORT'],
-            'user' => $env['DB_USER'],
-            'password' => $env['DB_PWD'],
-            'db_name' => $env['DB_NAME'],
-        ];
-        $this->table = $env['CRON_TABLE'];
-        $this->record = $env['CRON_LOG'];
-        $this->dbConfig = array_merge($this->dbConfig, $config);
-        if ($this->dbConfig['prefix']) {
-            $this->table = $this->dbConfig['prefix'] . $this->table;
-            $this->record = $this->dbConfig['prefix'] . $this->record;
-        }
-        return $this;
+    }
+
+    /**
+     * @param Worker $worker
+     */
+    public function onWorkerStop(Worker $worker)
+    {
+    }
+
+    /**
+     * 当客户端与Workerman建立连接时(TCP三次握手完成后)触发的回调函数
+     * @param TcpConnection $connection
+     */
+    public function onConnect(TcpConnection $connection)
+    {
+    }
+
+    /**
+     * 当客户端通过连接发来数据时(Workerman收到数据时)触发的回调函数
+     * @param TcpConnection $connection
+     * @param $request
+     */
+    public function onMessage(TcpConnection $connection, $request)
+    {
+    }
+
+    /**
+     * 当客户端连接与Workerman断开时触发的回调函数
+     * @param TcpConnection $connection
+     */
+    public function onClose(TcpConnection $connection)
+    {
+    }
+
+    /**
+     * 缓冲区满则会触发onBufferFull回调
+     * @param TcpConnection $connection
+     */
+    public function onBufferFull(TcpConnection $connection)
+    {
+    }
+
+    /**
+     * 在应用层发送缓冲区数据全部发送完毕后触发
+     * @param TcpConnection $connection
+     */
+    public function onBufferDrain(TcpConnection $connection)
+    {
+    }
+
+    /**
+     * 客户端的连接上发生错误时触发
+     * @param TcpConnection $connection
+     * @param $code
+     * @param $msg
+     */
+    public function onError(TcpConnection $connection, $code, $msg)
+    {
     }
 
     /**
