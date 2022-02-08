@@ -2,5 +2,6 @@
 /.vscode
 /vendor
 /.gitattributes
+composer.lock
 *.log
 .env
