@@ -7,6 +7,7 @@ namespace Cdyun\PhpCrontab;
 
 use Cdyun\PhpCrontab\Core\EnvService;
 use Cdyun\PhpCrontab\Core\ToolService;
+use Cdyun\PhpHttp\HttpService;
 use Workerman\Connection\TcpConnection;
 use Workerman\Crontab\Crontab;
 use Workerman\MySQL\Connection;
@@ -75,6 +76,12 @@ class Cron
      * @var string
      */
     private $record = 'system_crontab_log';
+
+    /**
+     * 定时任务日志表后缀 按月分表
+     * @var string|null
+     */
+    private $recordSuffix;
     /**
      * 错误信息
      * @var
@@ -193,6 +200,93 @@ class Cron
      */
     public function onConnect(TcpConnection $connection)
     {
+        $this->checkTables();
+    }
+
+    /**
+     * 检测表是否存在
+     */
+    public function checkTables()
+    {
+        $date = date('Ym', time());
+        if ($date !== $this->recordSuffix) {
+            $this->recordSuffix = $date;
+            $this->record .= "_" . $date;
+            $allTables = $this->listDbTables($this->dbConfig['db_name']);
+            !in_array($this->table, $allTables) && $this->createCrontabTable();
+            !in_array($this->record, $allTables) && $this->createCrontabTableLogs();
+        }
+    }
+
+    /**
+     * 获取数据库表名
+     * @param $dbname
+     * @return array
+     */
+    private function listDbTables($dbname)
+    {
+        return $this->dbPool[$this->worker->id]
+            ->select('TABLE_NAME')
+            ->from('information_schema.TABLES')
+            ->where("TABLE_TYPE='BASE TABLE'")
+            ->where("TABLE_SCHEMA='" . $dbname . "'")
+            ->column();
+    }
+
+    /**
+     * 创建定时器任务表
+     */
+    private function createCrontabTable()
+    {
+        $sql = <<<SQL
+ CREATE TABLE IF NOT EXISTS `{$this->table}`  (
+  `id` int(11) UNSIGNED NOT NULL AUTO_INCREMENT,
+  `title` varchar(60) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci NOT NULL COMMENT '任务标题',
+  `type` tinyint(4) NOT NULL DEFAULT 0 COMMENT '任务类型[1请求url,2执行shell]',
+  `frequency` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci NOT NULL COMMENT '任务频率',
+  `shell` varchar(150) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci NOT NULL DEFAULT '' COMMENT '任务脚本',
+  `running_times` int(11) NOT NULL DEFAULT 0 COMMENT '已运行次数',
+  `last_running_time` datetime NULL DEFAULT NULL COMMENT '最近运行时间',
+  `remark` varchar(200) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci NULL DEFAULT NULL COMMENT '任务备注',
+  `sort` int(11) NOT NULL DEFAULT 0 COMMENT '排序，越大越前',
+  `status` tinyint(4) NOT NULL DEFAULT 0 COMMENT '任务状态状态[0:禁用;1启用]',
+  `op_name` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci NULL DEFAULT NULL,
+  `create_time` datetime NULL DEFAULT NULL COMMENT '创建时间',
+  `update_time` datetime NULL DEFAULT NULL COMMENT '更新时间',
+  `delete_time` datetime NULL DEFAULT NULL,
+  PRIMARY KEY (`id`) USING BTREE,
+  INDEX `title`(`title`) USING BTREE,
+  INDEX `type`(`type`) USING BTREE,
+  INDEX `create_time`(`create_time`) USING BTREE,
+  INDEX `status`(`status`) USING BTREE
+) ENGINE = InnoDB AUTO_INCREMENT = 3 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_general_ci COMMENT = '定时器任务表' ROW_FORMAT = Dynamic
+SQL;
+
+        return $this->dbPool[$this->worker->id]->query($sql);
+    }
+
+    /**
+     * 创建定时器任务记录表
+     */
+    private function createCrontabTableLogs()
+    {
+        $sql = <<<SQL
+CREATE TABLE IF NOT EXISTS `{$this->record}`  (
+  `id` int(11) UNSIGNED NOT NULL AUTO_INCREMENT,
+  `sid` int(60) NOT NULL COMMENT '任务id',
+  `command` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci NOT NULL COMMENT '执行命令',
+  `output` text CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci NOT NULL COMMENT '执行输出',
+  `return_var` tinyint(4) NOT NULL COMMENT '执行返回状态[0成功; 1失败]',
+  `running_time` varchar(10) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci NOT NULL COMMENT '执行所用时间',
+  `create_time` datetime NULL DEFAULT NULL COMMENT '创建时间',
+  `update_time` datetime NULL DEFAULT NULL COMMENT '更新时间',
+  `delete_time` datetime NULL DEFAULT NULL,
+  PRIMARY KEY (`id`) USING BTREE,
+  INDEX `create_time`(`create_time`) USING BTREE
+) ENGINE = InnoDB AUTO_INCREMENT = 519 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_general_ci COMMENT = '定时器任务流水表{$this->recordSuffix}' ROW_FORMAT = Dynamic
+SQL;
+
+        return $this->dbPool[$this->worker->id]->query($sql);
     }
 
     /**
@@ -252,7 +346,10 @@ class Cron
             $this->dbConfig['password'],
             $this->dbConfig['db_name']
         );
-        $ids = $this->dbPool[$this->worker->id]
+
+        $this->checkTables(); //检测表
+
+        $ids = $this->dbPool[$worker->id]
             ->select('id')
             ->from($this->table)
             ->orderByASC(['sort'])
@@ -290,38 +387,44 @@ class Cron
             ->row();
 
         if (!empty($rs)) {
+            $callable = function () use ($rs) {
+                $tool = new ToolService();
+                $time = time();
+                $shell = trim($rs['shell']);
+                $this->debug && $tool->writeln('执行定时器任务#' . $rs['id'] . ' ' . $rs['frequency'] . ' ' . $shell);
+                $startTime = microtime(true);
+                if ($rs['type'] == 1) {
+                    $http = HttpService::getRequest($shell);
+                    $code = $http == false ? 0 : 1;
+                    $output = json_encode(json_decode($http, true), JSON_UNESCAPED_UNICODE);
+                } else {
+                    exec($shell, $output, $code);
+                    $output = join(PHP_EOL, $output);
+                }
+                $endTime = microtime(true);
+                $fmt = date('Y-m-d H:i:s', $time);
+                $this->dbPool[$this->worker->id]
+                    ->query("UPDATE {$this->table} SET running_times = running_times + 1, last_running_time = " . json_encode($fmt) . ", update_time = " . json_encode($fmt) . " WHERE id = {$rs['id']}");
+
+                $this->dbPool[$this->worker->id]
+                    ->insert($this->record)
+                    ->cols([
+                        'sid' => $rs['id'],
+                        'command' => $shell,
+                        'output' => $output,
+                        'return_var' => $code,
+                        'running_time' => round($endTime - $startTime, 6),
+                        'create_time' => date('Y-m-d H:i:s', time()),
+                        'update_time' => date('Y-m-d H:i:s', time()),
+                    ])
+                    ->query();
+            };
             $this->cronPool[$rs['id']] = [
                 'id' => $rs['id'],
                 'shell' => $rs['shell'],
                 'frequency' => $rs['frequency'],
                 'remark' => $rs['remark'],
-                'create_time' => date('Y-m-d H:i:s'),
-                'crontab' => new Crontab($rs['frequency'], function () use ($rs) {
-                    $tool = new ToolService();
-                    $time = time();
-                    $shell = trim($rs['shell']);
-                    $this->debug && $tool->writeln('执行定时器任务#' . $rs['id'] . ' ' . $rs['frequency'] . ' ' . $shell);
-                    $startTime = microtime(true);
-                    exec($shell, $output, $code);
-                    $endTime = microtime(true);
-                    $this->dbPool[$this->worker->id]
-                        ->update($this->table)->cols([
-                            'running_times' => ++$rs['running_times'],
-                            'last_running_time' => date('Y-m-d H:i:s', $time)
-                        ])->where('id= :id')->bindValues(['id' => $rs['id']])->query();
-
-                    $this->dbPool[$this->worker->id]
-                        ->insert($this->record)
-                        ->cols([
-                            'sid' => $rs['id'],
-                            'command' => $shell,
-                            'output' => join(PHP_EOL, $output),
-                            'return_var' => $code,
-                            'running_time' => round($endTime - $startTime, 6),
-                        ])
-                        ->query();
-
-                })
+                'crontab' => new Crontab($rs['frequency'], $callable)
             ];
         }
     }
