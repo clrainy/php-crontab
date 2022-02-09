@@ -3,6 +3,7 @@
 namespace Cdyun\PhpCrontab\Core;
 
 use Workerman\MySQL\Connection;
+use Workerman\Protocols\Http\Request;
 
 /**
  *
@@ -41,13 +42,16 @@ trait DbTrait
             'password' => $env['DB_PWD'],
             'db_name' => $env['DB_NAME'],
         ];
-        $this->table = $env['CRON_TABLE'];
-        $this->record = $env['CRON_LOG'];
+        $this->cronTable = $env['CRON_TABLE'];
+        $this->cronRecord = $env['CRON_LOG'];
         $this->dbConfig = array_merge($this->dbConfig, $config);
         if ($this->dbConfig['prefix']) {
-            $this->table = $this->dbConfig['prefix'] . $this->table;
-            $this->record = $this->dbConfig['prefix'] . $this->record;
+            $this->cronTable = $this->dbConfig['prefix'] . $this->cronTable;
+            $this->cronRecord = $this->dbConfig['prefix'] . $this->cronRecord;
         }
+
+        $this->debug = isset($env['CRON_DEBUG']) && $env['CRON_DEBUG'] == true;
+        $this->safeKey = isset($env['SAFE_KEY']) && !empty($env['SAFE_KEY']) ? $env['SAFE_KEY'] : null;
     }
 
     /**
@@ -58,10 +62,10 @@ trait DbTrait
         $date = date('Ym', time());
         if ($date !== $this->recordSuffix) {
             $this->recordSuffix = $date;
-            $this->record .= "_" . $date;
+            $this->cronRecord .= "_" . $date;
             $allTables = $this->listDbTables($this->dbConfig['db_name']);
-            !in_array($this->table, $allTables) && $this->createCrontabTable();
-            !in_array($this->record, $allTables) && $this->createCrontabTableLogs();
+            !in_array($this->cronTable, $allTables) && $this->createCrontabTable();
+            !in_array($this->cronRecord, $allTables) && $this->createCrontabTableLogs();
         }
     }
 
@@ -86,7 +90,7 @@ trait DbTrait
     private function createCrontabTable()
     {
         $sql = <<<SQL
- CREATE TABLE IF NOT EXISTS `{$this->table}`  (
+ CREATE TABLE IF NOT EXISTS `{$this->cronTable}`  (
   `id` int(11) UNSIGNED NOT NULL AUTO_INCREMENT,
   `title` varchar(60) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci NOT NULL COMMENT '任务标题',
   `type` tinyint(4) NOT NULL DEFAULT 0 COMMENT '任务类型[1请求url,2执行shell]',
@@ -118,7 +122,7 @@ SQL;
     private function createCrontabTableLogs()
     {
         $sql = <<<SQL
-CREATE TABLE IF NOT EXISTS `{$this->record}`  (
+CREATE TABLE IF NOT EXISTS `{$this->cronRecord}`  (
   `id` int(11) UNSIGNED NOT NULL AUTO_INCREMENT,
   `sid` int(60) NOT NULL COMMENT '任务id',
   `command` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci NOT NULL COMMENT '执行命令',
@@ -169,7 +173,7 @@ SQL;
     {
         return $this->dbPool[$this->worker->id]
             ->query("
-UPDATE {$this->table} 
+UPDATE {$this->cronTable} 
 SET running_times = running_times + 1, 
     last_running_time = " . $date . ",
     update_time = " . $date . " 
@@ -202,10 +206,120 @@ WHERE id = {$id}
     {
         return $this->dbPool[$this->worker->id]
             ->select('*')
-            ->from($this->table)
+            ->from($this->cronTable)
             ->where('id= :id')
             ->where('status= :status')
             ->bindValues(['id' => $id, 'status' => 1])
             ->row();
+    }
+
+
+    /**
+     * 定时器列表
+     * @param Request $request
+     * @return array
+     */
+    private function crontabIndex($request)
+    {
+        list($page, $limit, $where) = $this->buildTableParames($request->get());
+        list($whereStr, $bindValues) = $this->parseWhere($where);
+
+        $data = $this->dbPool[$this->worker->id]
+            ->select('*')
+            ->from($this->cronTable)
+            ->where($whereStr)
+            ->orderByDESC(['Id'])
+            ->limit($limit)
+            ->offset(($page - 1) * $limit)
+            ->bindValues($bindValues)
+            ->query();
+
+        $count = $this->dbPool[$this->worker->id]
+            ->select('count(id)')
+            ->from($this->cronTable)
+            ->where($whereStr)
+            ->bindValues($bindValues)
+            ->single();
+
+        return ['list' => $data, 'count' => $count];
+    }
+
+    /**
+     * 构建请求参数
+     * @param array $get
+     * @param array $excludeFields 忽略构建搜索的字段
+     * @return array
+     */
+    private function buildTableParames($get, $excludeFields = [])
+    {
+        $page = isset($get['page']) && !empty($get['page']) ? (int)$get['page'] : 1;
+        $limit = isset($get['limit']) && !empty($get['limit']) ? (int)$get['limit'] : 15;
+        $filters = isset($get['filter']) && !empty($get['filter']) ? $get['filter'] : '{}';
+        $ops = isset($get['op']) && !empty($get['op']) ? $get['op'] : '{}';
+        // json转数组
+        $filters = json_decode($filters, true);
+        $ops = json_decode($ops, true);
+        $where = [];
+        $excludes = [];
+
+        foreach ($filters as $key => $val) {
+            if (in_array($key, $excludeFields)) {
+                $excludes[$key] = $val;
+                continue;
+            }
+            $op = isset($ops[$key]) && !empty($ops[$key]) ? $ops[$key] : '%*%';
+
+            switch (strtolower($op)) {
+                case '=':
+                    $where[] = [$key, '=', $val];
+                    break;
+                case '%*%':
+                    $where[] = [$key, 'LIKE', "%{$val}%"];
+                    break;
+                case '*%':
+                    $where[] = [$key, 'LIKE', "{$val}%"];
+                    break;
+                case '%*':
+                    $where[] = [$key, 'LIKE', "%{$val}"];
+                    break;
+                case 'range':
+                    list($beginTime, $endTime) = explode(' - ', $val);
+                    $where[] = [$key, '>=', strtotime($beginTime)];
+                    $where[] = [$key, '<=', strtotime($endTime)];
+                    break;
+                default:
+                    $where[] = [$key, $op, "%{$val}"];
+            }
+        }
+
+        return [$page, $limit, $where, $excludes];
+    }
+
+    /**
+     * 解析列表where条件
+     * @param $where
+     * @return array
+     */
+    private function parseWhere($where)
+    {
+        if (!empty($where)) {
+            $whereStr = '';
+            $bindValues = [];
+            $whereCount = count($where);
+            foreach ($where as $index => $item) {
+                if ($item[0] === 'create_time') {
+                    $whereStr .= $item[0] . ' ' . $item[1] . ' :' . $item[0] . $index . (($index == $whereCount - 1) ? ' ' : ' AND ');
+                    $bindValues[$item[0] . $index] = $item[2];
+                } else {
+                    $whereStr .= $item[0] . ' ' . $item[1] . ' :' . $item[0] . (($index == $whereCount - 1) ? ' ' : ' AND ');
+                    $bindValues[$item[0]] = $item[2];
+                }
+            }
+        } else {
+            $whereStr = '1 = 1';
+            $bindValues = [];
+        }
+
+        return [$whereStr, $bindValues];
     }
 }

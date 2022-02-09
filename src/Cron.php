@@ -7,6 +7,7 @@ namespace Cdyun\PhpCrontab;
 
 use Cdyun\PhpCrontab\Core\DbTrait;
 use Cdyun\PhpCrontab\Core\EnvTrait;
+use Cdyun\PhpCrontab\Core\RouteTrait;
 use Cdyun\PhpCrontab\Core\ToolTrait;
 use Cdyun\PhpHttp\HttpService;
 use Workerman\Connection\TcpConnection;
@@ -23,6 +24,7 @@ class Cron
     use EnvTrait;
     use DbTrait;
     use ToolTrait;
+    use RouteTrait;
 
     /**
      *环境配置
@@ -74,13 +76,13 @@ class Cron
      * 定时任务表
      * @var string
      */
-    private $table = 'system_crontab';
+    private $cronTable = 'system_crontab';
 
     /**
      * 定时任务日志表
      * @var string
      */
-    private $record = 'system_crontab_log';
+    private $cronRecord = 'system_crontab_log';
 
     /**
      * 定时任务日志表后缀 按月分表
@@ -105,9 +107,8 @@ class Cron
         try {
             $this->checkEnv();
             $this->setDbConfig($env);
-            $this->debug = isset($env['CRON_DEBUG']) && $env['CRON_DEBUG'] == true;
+            $this->registerRoute();
             $this->initWorker($env['BASE_URI'], []);
-            $this->setSafeKey(isset($env['SAFE_KEY']) && !empty($env['SAFE_KEY']) ? $env['SAFE_KEY'] : null);
         } catch (Core\CronException $e) {
             $eMsg[] = $e->getMessage();
             $this->errorMsg = array_merge($this->errorMsg, $eMsg);
@@ -146,18 +147,6 @@ class Cron
         $this->worker->onBufferFull = [$this, 'onBufferFull'];
         $this->worker->onBufferDrain = [$this, 'onBufferDrain'];
         $this->worker->onError = [$this, 'onError'];
-    }
-
-    /**
-     * 启用安全模式
-     * @param $key
-     * @return $this
-     */
-    public function setSafeKey($key)
-    {
-        $this->safeKey = $key;
-
-        return $this;
     }
 
     /**
@@ -240,7 +229,7 @@ class Cron
 
         $ids = $this->dbPool[$worker->id]
             ->select('id')
-            ->from($this->table)
+            ->from($this->cronTable)
             ->orderByASC(['sort'])
             ->where("status = 1")
             ->column();
@@ -285,7 +274,7 @@ class Cron
                 }
                 $endTime = microtime(true);
                 $this->cronUpdate(json_encode(date('Y-m-d H:i:s', $time)), $rs['id']);
-                $this->create($this->record, [
+                $this->create($this->cronRecord, [
                     'sid' => $rs['id'],
                     'command' => $shell,
                     'output' => $output,

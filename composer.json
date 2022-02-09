@@ -17,6 +17,7 @@
     "workerman/mysql": "^1.0",
     "workerman/crontab": "^1.0",
     "cdyun/php-http": "dev-master",
+    "cdyun/php-router": "dev-master",
     "ext-json": "*"
   }
 }
