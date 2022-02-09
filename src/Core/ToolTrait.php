@@ -3,10 +3,10 @@
 namespace Cdyun\PhpCrontab\Core;
 
 /**
- * Class ToolService
+ * Class ToolTrait
  * @package Cdyun\PhpCrontab\Core
  */
-class ToolService
+trait ToolTrait
 {
     /**
      * 输出日志

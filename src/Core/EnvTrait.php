@@ -3,22 +3,16 @@
 namespace Cdyun\PhpCrontab\Core;
 
 /**
- * Class CheckEnv
+ * Class EnvTrait
  * @package Cdyun\PhpCrontab\Core
  */
-class EnvService
+trait EnvTrait
 {
-    protected $data = [];
     /**
      * 最低PHP版本
      * @var string
      */
     private $lessPhpVersion = '5.3.3';
-
-    public function __construct($env = [])
-    {
-        $this->data = $env;
-    }
 
     /**
      *运行环境检测
@@ -66,25 +60,6 @@ class EnvService
                 }
             }
         }
-        $config = $this->data;
-        if (empty($config)) {
-            throw new CronException('应用配置文件.env缺少参数：CRONTAB');
-        }
-        if (!isset($config['DB_HOST']) || empty($config['DB_HOST'])) {
-            throw new CronException('应用配置文件中CRONTAB缺少mysql地址：DB_HOST');
-        }
-        if (!isset($config['DB_NAME']) || empty($config['DB_NAME'])) {
-            throw new CronException('应用配置文件中CRONTAB缺少数据库名称：DB_NAME');
-        }
-        if (!isset($config['DB_USER']) || empty($config['DB_USER'])) {
-            throw new CronException('应用配置文件中CRONTAB缺少数据库用户名：DB_USER');
-        }
-        if (!isset($config['DB_PWD']) || empty($config['DB_PWD'])) {
-            throw new CronException('应用配置文件中CRONTAB缺少数据库密码：DB_PWD');
-        }
-        if (!isset($config['DB_PORT']) || empty($config['DB_PORT'])) {
-            throw new CronException('应用配置文件中CRONTAB缺少数据库端口：DB_PORT');
-        }
     }
 
     /**
@@ -125,14 +100,5 @@ class EnvService
     private function extensionLoaded($extension)
     {
         return in_array($extension, get_loaded_extensions());
-    }
-
-    /**
-     * 获取env数据
-     * @return array|false
-     */
-    public function getEnv()
-    {
-        return $this->data;
     }
 }
