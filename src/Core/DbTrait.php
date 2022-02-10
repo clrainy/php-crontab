@@ -19,6 +19,7 @@ trait DbTrait
      */
     public function setDbConfig(array $env = [])
     {
+        $env = array_merge($this->env, $env);
         if (!isset($env['DB_HOST']) || empty($env['DB_HOST'])) {
             throw new CronException('应用配置文件中CRONTAB缺少mysql地址：DB_HOST');
         }
@@ -64,8 +65,8 @@ trait DbTrait
             $this->recordSuffix = $date;
             $this->cronRecord .= "_" . $date;
             $allTables = $this->listDbTables($this->dbConfig['db_name']);
-            !in_array($this->cronTable, $allTables) && $this->createCrontabTable();
-            !in_array($this->cronRecord, $allTables) && $this->createCrontabTableLogs();
+            !in_array($this->cronTable, $allTables) && $this->createCronTable();
+            !in_array($this->cronRecord, $allTables) && $this->createCronLogs();
         }
     }
 
@@ -87,7 +88,7 @@ trait DbTrait
     /**
      * 创建定时器任务表
      */
-    private function createCrontabTable()
+    private function createCronTable()
     {
         $sql = <<<SQL
  CREATE TABLE IF NOT EXISTS `{$this->cronTable}`  (
@@ -119,7 +120,7 @@ SQL;
     /**
      * 创建定时器任务记录表
      */
-    private function createCrontabTableLogs()
+    private function createCronLogs()
     {
         $sql = <<<SQL
 CREATE TABLE IF NOT EXISTS `{$this->cronRecord}`  (
@@ -219,7 +220,7 @@ WHERE id = {$id}
      * @param Request $request
      * @return array
      */
-    private function crontabIndex($request)
+    private function cronIndex($request)
     {
         list($page, $limit, $where) = $this->buildTableParames($request->get());
         list($whereStr, $bindValues) = $this->parseWhere($where);

@@ -27,6 +27,18 @@ class Cron
     use RouteTrait;
 
     /**
+     * 路由信息
+     * */
+    protected $indexPath = '/crontab/index';
+    protected $createPath = '/crontab/create';
+    protected $modifyPath = '/crontab/modify';
+    protected $reloadPath = '/crontab/reload';
+    protected $deletePath = '/crontab/delete';
+    protected $logsPath = '/crontab/logs';
+    protected $poolPath = '/crontab/pool';
+    protected $pingPath = '/crontab/ping';
+    protected $errorPath = '/crontab/error';
+    /**
      *环境配置
      * */
     private $env = [];
@@ -43,7 +55,6 @@ class Cron
         'charset' => 'utf8mb4',
         'prefix' => '',
     ];
-
     /**
      * 数据库进程池
      * @var Connection[] array
@@ -55,7 +66,6 @@ class Cron
      * @var Crontab[] array
      */
     private $cronPool = [];
-
     /**
      * 调试模式
      * @var bool
@@ -71,19 +81,16 @@ class Cron
      * @var string
      */
     private $workerName = "Workerman Crontab";
-
     /**
      * 定时任务表
      * @var string
      */
     private $cronTable = 'system_crontab';
-
     /**
      * 定时任务日志表
      * @var string
      */
     private $cronRecord = 'system_crontab_log';
-
     /**
      * 定时任务日志表后缀 按月分表
      * @var string|null
@@ -94,7 +101,6 @@ class Cron
      * @var
      */
     private $errorMsg = [];
-
     /**
      * 安全秘钥
      * @var string
@@ -107,6 +113,7 @@ class Cron
         try {
             $this->checkEnv();
             $this->setDbConfig($env);
+            $this->setRouterConfig($env);
             $this->registerRoute();
             $this->initWorker($env['BASE_URI'], []);
         } catch (Core\CronException $e) {
