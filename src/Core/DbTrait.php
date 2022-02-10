@@ -50,6 +50,9 @@ trait DbTrait
             $this->cronTable = $this->dbConfig['prefix'] . $this->cronTable;
             $this->cronRecord = $this->dbConfig['prefix'] . $this->cronRecord;
         }
+        if (isset($env['BASE_URL']) && !empty($env['BASE_URL'])) {
+            $this->base_url = $env['BASE_URL'];
+        }
 
         $this->debug = isset($env['CRON_DEBUG']) && $env['CRON_DEBUG'] == true;
         $this->safeKey = isset($env['SAFE_KEY']) && !empty($env['SAFE_KEY']) ? $env['SAFE_KEY'] : null;

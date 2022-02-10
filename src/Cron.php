@@ -106,6 +106,10 @@ class Cron
      * @var string
      */
     private $safeKey;
+    /**
+     *socket监听$listen参数
+     * */
+    private $base_url = 'http://127.0.0.1:2345';
 
     public function __construct($env = [])
     {
@@ -115,11 +119,10 @@ class Cron
             $this->setDbConfig($env);
             $this->setRouterConfig($env);
             $this->registerRoute();
-            $this->initWorker($env['BASE_URI'], []);
+            $this->initWorker($this->base_url, []);
         } catch (Core\CronException $e) {
             $eMsg[] = $e->getMessage();
             $this->errorMsg = array_merge($this->errorMsg, $eMsg);
-
         }
     }
 
@@ -131,7 +134,7 @@ class Cron
      */
     private function initWorker($socketName = '', $contextOption = [])
     {
-        $socketName = $socketName ?: 'http://127.0.0.1:2345';
+        $socketName = $socketName ?: $this->base_url;
         $this->worker = new Worker($socketName, $contextOption);
         $this->worker->name = $this->workerName;
         if (isset($contextOption['ssl'])) {
@@ -299,6 +302,15 @@ class Cron
                 'crontab' => new Crontab($rs['frequency'], $callable)
             ];
         }
+    }
+
+    /**
+     * 获取base_url
+     * @return string
+     */
+    public function getBaseUrl()
+    {
+        return $this->base_url;
     }
 
 
