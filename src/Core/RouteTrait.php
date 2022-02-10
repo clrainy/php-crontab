@@ -51,7 +51,9 @@ trait RouteTrait
         Route::post($this->reloadPath, [$this, 'cronReload']);
         Route::get($this->logsPath, [$this, 'cronLogs']);
         Route::get($this->poolPath, [$this, 'cronPool']);
-        Route::get($this->pingPath, [$this, 'cronPing']);
+        Route::get($this->pingPath, function() {
+            return 'GET/POST请求';
+        });
     }
 
     /**
