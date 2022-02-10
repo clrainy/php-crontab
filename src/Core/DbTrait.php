@@ -170,7 +170,7 @@ SQL;
      * @param $id
      * @return mixed
      */
-    private function cronUpdate(string $date, $id)
+    private function updateCron(string $date, $id)
     {
         return $this->dbPool[$this->worker->id]
             ->query("
@@ -322,5 +322,40 @@ WHERE id = {$id}
         }
 
         return [$whereStr, $bindValues];
+    }
+
+    private function cronCreate()
+    {
+        return ['action' => 'create'];
+    }
+
+    private function cronModify()
+    {
+        return ['action' => 'modify'];
+    }
+
+    private function cronDelete()
+    {
+        return ['action' => 'delete'];
+    }
+
+    private function cronReload()
+    {
+        return ['action' => 'reload'];
+    }
+
+    private function cronLogs()
+    {
+        return ['action' => 'logs'];
+    }
+
+    private function cronPool()
+    {
+        return ['action' => 'pool'];
+    }
+
+    private function cronPing()
+    {
+        return ['action' => 'ping'];
     }
 }

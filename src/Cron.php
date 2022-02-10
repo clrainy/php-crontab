@@ -280,7 +280,7 @@ class Cron
                     $output = join(PHP_EOL, $output);
                 }
                 $endTime = microtime(true);
-                $this->cronUpdate(json_encode(date('Y-m-d H:i:s', $time)), $rs['id']);
+                $this->updateCron(json_encode(date('Y-m-d H:i:s', $time)), $rs['id']);
                 $this->create($this->cronRecord, [
                     'sid' => $rs['id'],
                     'command' => $shell,
