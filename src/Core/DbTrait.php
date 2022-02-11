@@ -303,17 +303,15 @@ SQL;
      */
     public function cronModify(Request $request)
     {
-
         $params = $this->allowField($request->post());
         if(!$params || empty($params)) return false;
         $row = $this->update($this->cronTable, $params, 'id=' . $params['id']);
+        if (isset($this->cronPool[$params['id']])) {
+            $this->cronPool[$params['id']]['crontab']->destroy();
+            unset($this->cronPool[$params['id']]);
+        }
         if (isset($params['status']) && $params['status'] == 1) {
             $this->cronRun($params['id']);
-        } else {
-            if (isset($this->cronPool[$params['id']])) {
-                $this->cronPool[$params['id']]['crontab']->destroy();
-                unset($this->cronPool[$params['id']]);
-            }
         }
         return $row ? true : false;
     }
