@@ -262,17 +262,7 @@ SQL;
     {
         $params = $this->allowField($request->post());
         if(!$params || empty($params)) return false;
-        $id = $this->create($this->cronTable, [
-            'title' => $params['title'],
-            'type' => $params['type'],
-            'frequency' => $params['frequency'],
-            'shell' => $params['shell'],
-            'remark' => $params['remark'],
-            'sort' => $params['sort'],
-            'status' => $params['status'],
-            'create_time' => $params['title'],
-            'update_time' => $params['title'],
-        ]);
+        $id = $this->create($this->cronTable, $params);
         $id && $this->cronRun($id);
         return $id ? true : false;
     }
