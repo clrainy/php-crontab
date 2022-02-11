@@ -145,80 +145,6 @@ SQL;
     }
 
     /**
-     * 数据新增
-     * @param $table
-     * @param array $data
-     * @return mixed
-     */
-    private function create($table, array $data)
-    {
-        return $this->dbPool[$this->worker->id]->insert($table)->cols($data)->query();
-    }
-
-    /**
-     * 数据更新
-     * @param $table
-     * @param array $data
-     * @param $where
-     * @return mixed
-     */
-    private function update($table, array $data, string $where)
-    {
-        return $this->dbPool[$this->worker->id]->update($table)->cols($data)->where($where)->query();
-    }
-
-    /**
-     * 更新定时器
-     * @param string $date
-     * @param $id
-     * @return mixed
-     */
-    private function updateCron(string $date, $id)
-    {
-        return $this->dbPool[$this->worker->id]
-            ->query("
-UPDATE {$this->cronTable} 
-SET running_times = running_times + 1, 
-    last_running_time = " . $date . ",
-    update_time = " . $date . " 
-WHERE id = {$id}
-     ");
-    }
-
-
-    /**
-     * 连接数据库
-     * @return Connection
-     */
-    private function dbConnection()
-    {
-        return new Connection(
-            $this->dbConfig['host'],
-            $this->dbConfig['port'],
-            $this->dbConfig['user'],
-            $this->dbConfig['password'],
-            $this->dbConfig['db_name']
-        );
-    }
-
-    /**
-     * 获取指定定时器信息
-     * @param $id
-     * @return mixed
-     */
-    private function getCron($id)
-    {
-        return $this->dbPool[$this->worker->id]
-            ->select('*')
-            ->from($this->cronTable)
-            ->where('id= :id')
-            ->where('status= :status')
-            ->bindValues(['id' => $id, 'status' => 1])
-            ->row();
-    }
-
-
-    /**
      * 定时器列表
      * @param Request $request
      * @return array
@@ -327,38 +253,211 @@ WHERE id = {$id}
         return [$whereStr, $bindValues];
     }
 
-    public function cronCreate()
+    /**
+     * 新增
+     * @param Request $request
+     * @return bool
+     */
+    public function cronCreate(Request $request)
     {
-        return ['action' => 'create'];
+        $params = $request->post();
+        $id = $this->create($this->cronTable, $params);
+        $id && $this->cronRun($id);
+        return $id ? true : false;
     }
 
-    public function cronModify()
+    /**
+     * 数据新增
+     * @param $table
+     * @param array $data
+     * @return mixed
+     */
+    private function create($table, array $data)
     {
-        return ['action' => 'modify'];
+        return $this->dbPool[$this->worker->id]->insert($table)->cols($data)->query();
     }
 
-    public function cronDelete()
+    /**
+     * 编辑定时器
+     * @param Request $request
+     * @return bool
+     */
+    public function cronModify(Request $request)
     {
-        return ['action' => 'delete'];
+        $params = $request->post();
+        $row = $this->update($this->cronTable, $params, 'id=' . $params['id']);
+        if (isset($params['status']) && $params['status'] == 1) {
+            $this->cronRun($params['id']);
+        } else {
+            if (isset($this->cronPool[$params['id']])) {
+                $this->cronPool[$params['id']]['crontab']->destroy();
+                unset($this->cronPool[$params['id']]);
+            }
+        }
+        return $row ? true : false;
     }
 
-    public function cronReload()
+    /**
+     * 数据更新
+     * @param $table
+     * @param array $data
+     * @param $where
+     * @return mixed
+     */
+    private function update($table, array $data, string $where)
     {
-        return ['action' => 'reload'];
+        return $this->dbPool[$this->worker->id]->update($table)->cols($data)->where($where)->query();
     }
 
-    public function cronLogs()
+    /**
+     * 删除定时器
+     * @param Request $request
+     * @return bool
+     */
+    public function cronDelete(Request $request)
     {
-        return ['action' => 'logs'];
+        if ($id = $request->post('id')) {
+            $ids = explode(',', $id);
+            foreach ($ids as $item) {
+                if (isset($this->cronPool[$item])) {
+                    $this->cronPool[$item]['crontab']->destroy();
+                    unset($this->cronPool[$item]);
+                }
+            }
+            $rows = $this->dbPool[$this->worker->id]->delete($this->cronTable)->where('id in (' . $id . ')')->query();
+            return $rows ? true : false;
+        }
+        return true;
     }
 
+    /**
+     * 重启定时任务
+     * @param Request $request
+     * @return bool
+     */
+    public function cronReload(Request $request)
+    {
+        $ids = explode(',', $request->post('id'));
+        foreach ($ids as $id) {
+            if (isset($this->cronPool[$id])) {
+                $this->cronPool[$id]['crontab']->destroy();
+                unset($this->cronPool[$id]);
+            }
+            $this->update($this->cronTable,['status'=>1],'id='.$id);
+            $this->cronRun($id);
+        }
+
+        return true;
+    }
+
+    /**
+     * 日志列表
+     * @param Request $request
+     * @return array
+     */
+    public function cronLogs(Request $request)
+    {
+        list($page, $limit, $where, $excludeFields) = $this->buildTableParames($request->get(), ['month']);
+        $request->get('sid') && $where[] = ['sid', '=', $request->get('sid')];
+        list($whereStr, $bindValues) = $this->parseWhere($where);
+
+        $allTables = $this->listDbTables($this->dbConfig['database']);
+        $tableName = isset($excludeFields['month']) && !empty($excludeFields['month']) ?
+            preg_replace('/_\d+/', '_' . date('Ym', strtotime($excludeFields['month'])), $this->cronRecord) :
+            $this->cronRecord;
+        $data = [];
+        $count = 0;
+        if (in_array($tableName, $allTables)) {
+            $data = $this->dbPool[$this->worker->id]
+                ->select('*')
+                ->from($tableName)
+                ->where($whereStr)
+                ->orderByDESC(['Id'])
+                ->limit($limit)
+                ->offset(($page - 1) * $limit)
+                ->bindValues($bindValues)
+                ->query();
+
+            $count = $this->dbPool[$this->worker->id]
+                ->select('count(id)')
+                ->from($tableName)
+                ->where($whereStr)
+                ->bindValues($bindValues)
+                ->single();
+        }
+
+        return ['list' => $data, 'count' => $count];
+    }
+
+    /**定时器池
+     * @return array
+     */
     public function cronPool()
     {
-        return ['action' => 'pool'];
+        $data = [];
+        foreach ($this->cronPool as $row) {
+            unset($row['crontab']);
+            $data[] = $row;
+        }
+        return $data;
     }
 
-    public function cronPing()
+    /**
+     * 连接
+     * @param Request $request
+     * @return string
+     */
+    public function cronPing(Request $request)
     {
-        return ['action' => 'ping'];
+        return '连接成功';
+    }
+
+    /**
+     * 更新定时器
+     * @param string $date
+     * @param $id
+     * @return mixed
+     */
+    private function updateCron(string $date, $id)
+    {
+        return $this->dbPool[$this->worker->id]
+            ->query("
+UPDATE {$this->cronTable} 
+SET running_times = running_times + 1, 
+    last_running_time = " . $date . ",
+    update_time = " . $date . " 
+WHERE id = {$id}
+     ");
+    }
+
+    /**
+     * 连接数据库
+     * @return Connection
+     */
+    private function dbConnection()
+    {
+        return new Connection(
+            $this->dbConfig['host'],
+            $this->dbConfig['port'],
+            $this->dbConfig['user'],
+            $this->dbConfig['password'],
+            $this->dbConfig['db_name']
+        );
+    }
+
+    /**
+     * 获取指定定时器信息
+     * @param $id
+     * @return mixed
+     */
+    private function getCron($id)
+    {
+        return $this->dbPool[$this->worker->id]
+            ->select('*')
+            ->from($this->cronTable)
+            ->where('id= :id')
+            ->where('status= :status')
+            ->bindValues(['id' => $id, 'status' => 1])
+            ->row();
     }
 }

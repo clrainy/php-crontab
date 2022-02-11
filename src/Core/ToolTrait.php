@@ -17,7 +17,7 @@ trait ToolTrait
      */
     public function writeln($msg, $ok = true)
     {
-//        echo '[' . date('Y-m-d H:i:s') . '] ' . $msg . ($ok ? " [Ok] " : " [Fail] ") . PHP_EOL;
+        echo '[' . date('Y-m-d H:i:s') . '] ' . $msg . ($ok ? " [Ok] " : " [Fail] ") . PHP_EOL;
     }
 
 

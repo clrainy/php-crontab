@@ -3,18 +3,18 @@
 namespace Cdyun\PhpCrontab\Core;
 
 /**
- * @method static UseRouter get(string $route, Callable $callback)
- * @method static UseRouter post(string $route, Callable $callback)
- * @method static UseRouter put(string $route, Callable $callback)
- * @method static UseRouter delete(string $route, Callable $callback)
- * @method static UseRouter options(string $route, Callable $callback)
- * @method static UseRouter head(string $route, Callable $callback)
+ * @method static UseRouter get(string $route, string $name)
+ * @method static UseRouter post(string $route, string $name)
+ * @method static UseRouter put(string $route, string $name)
+ * @method static UseRouter delete(string $route, string $name)
+ * @method static UseRouter options(string $route, string $name)
+ * @method static UseRouter head(string $route, string $name)
  */
 class UseRouter
 {
     public static $routes = array();
     public static $methods = array();
-    public static $callbacks = array();
+    public static $fucName = array();
     public static $error_callback;
 
     /**
@@ -25,11 +25,11 @@ class UseRouter
     public static function __callStatic($method, $params)
     {
         $uri = strpos($params[0], '/') === 0 ? $params[0] : '/' . $params[0];
-        $callback = $params[1];
+        $name = $params[1];
 
         array_push(self::$routes, $uri);
         array_push(self::$methods, strtoupper($method));
-        array_push(self::$callbacks, $callback);
+        array_push(self::$fucName, $name);
     }
 
     /**
@@ -54,7 +54,7 @@ class UseRouter
             $route_keys = array_keys(self::$routes, $uri);
             foreach ($route_keys as $key) {
                 if (self::$methods[$key] == $method || self::$methods[$key] == 'ANY') $beRoute = true;
-                if ($beRoute) return call_user_func(self::$callbacks[$key]);
+                if ($beRoute) return self::$fucName[$key];
             }
         }
         if ($beRoute == false) {
@@ -63,8 +63,7 @@ class UseRouter
                     return "404 Not Found";
                 };
             }
-            return call_user_func(self::$error_callback);
         }
-        return '404';
+        return self::$error_callback;
     }
 }

@@ -196,12 +196,15 @@ class Cron
             if (!is_null($this->safeKey) && $request->header('key') !== $this->safeKey) {
                 $connection->send($this->response('', 'Error SafeKey,Connection Not Allowed!', 403));
             } else {
-//                var_dump($request->method());
-//                var_dump($request->path());
-//                var_dump($request->get());
-//                var_dump($request->post());
-//                var_dump($request->uri());
-                $connection->send($this->response(UseRouter::dispatch($request->method(), $request->path())));
+                $fuc = UseRouter::dispatch($request->method(), $request->path());
+                if (is_string($fuc)) {
+                    if (!method_exists($this, $fuc)) {
+                        $connection->send($this->response('', 'No Method:' . $fuc, 403));
+                    }
+                    $connection->send($this->response(call_user_func([$this, $fuc], $request)));
+                } else {
+                    $connection->send($this->response(call_user_func($fuc)));
+                }
             }
         }
     }
@@ -260,7 +263,7 @@ class Cron
             ->column();
         if (!empty($ids)) {
             foreach ($ids as $vo) {
-                $this->crontabRun($vo);
+                $this->cronRun($vo);
             }
         }
 
@@ -279,7 +282,7 @@ class Cron
      * +-------------- sec (0-59)[可省略，如果没有0位,则最小时间粒度是分钟]
      * @param $item
      */
-    private function crontabRun($item)
+    private function cronRun($item)
     {
         $rs = $this->getCron($item);
 

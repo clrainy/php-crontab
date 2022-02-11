@@ -42,14 +42,14 @@ trait RouteTrait
      * */
     private function registerRoute()
     {
-        UseRouter::get($this->indexPath, [$this, 'cronIndex']);
-        UseRouter::post($this->createPath, [$this, 'cronCreate']);
-        UseRouter::post($this->modifyPath, [$this, 'cronModify']);
-        UseRouter::post($this->deletePath, [$this, 'cronDelete']);
-        UseRouter::post($this->reloadPath, [$this, 'cronReload']);
-        UseRouter::get($this->logsPath, [$this, 'cronLogs']);
-        UseRouter::get($this->poolPath, [$this, 'cronPool']);
-        UseRouter::get($this->pingPath, [$this, 'cronPing']);
+        UseRouter::get($this->indexPath, 'cronIndex');
+        UseRouter::post($this->createPath, 'cronCreate');
+        UseRouter::post($this->modifyPath, 'cronModify');
+        UseRouter::post($this->deletePath, 'cronDelete');
+        UseRouter::post($this->reloadPath, 'cronReload');
+        UseRouter::get($this->logsPath, 'cronLogs');
+        UseRouter::get($this->poolPath, 'cronPool');
+        UseRouter::get($this->pingPath, 'cronPing');
     }
 
     /**
