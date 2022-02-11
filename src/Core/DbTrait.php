@@ -260,10 +260,39 @@ SQL;
      */
     public function cronCreate(Request $request)
     {
-        $params = $request->post();
-        $id = $this->create($this->cronTable, $params);
+        $params = $this->allowField($request->post());
+        if(!$params || empty($params)) return false;
+        $id = $this->create($this->cronTable, [
+            'title' => $params['title'],
+            'type' => $params['type'],
+            'frequency' => $params['frequency'],
+            'shell' => $params['shell'],
+            'remark' => $params['remark'],
+            'sort' => $params['sort'],
+            'status' => $params['status'],
+            'create_time' => $params['title'],
+            'update_time' => $params['title'],
+        ]);
         $id && $this->cronRun($id);
         return $id ? true : false;
+    }
+
+    /**
+     * 过滤数据表字段
+     * @param $params
+     * @return false
+     */
+    public function allowField($params)
+    {
+        if ($this->cronField) {
+            $field = explode(',', $this->cronField);
+            foreach ($params as $key => $vo) {
+                if (!in_array($key, $field)) unset($params[$key]);
+            }
+            return $params;
+        }
+        return false;
+
     }
 
     /**
@@ -284,7 +313,9 @@ SQL;
      */
     public function cronModify(Request $request)
     {
-        $params = $request->post();
+
+        $params = $this->allowField($request->post());
+        if(!$params || empty($params)) return false;
         $row = $this->update($this->cronTable, $params, 'id=' . $params['id']);
         if (isset($params['status']) && $params['status'] == 1) {
             $this->cronRun($params['id']);
@@ -343,7 +374,7 @@ SQL;
                 $this->cronPool[$id]['crontab']->destroy();
                 unset($this->cronPool[$id]);
             }
-            $this->update($this->cronTable,['status'=>1],'id='.$id);
+            $this->update($this->cronTable, ['status' => 1], 'id=' . $id);
             $this->cronRun($id);
         }
 

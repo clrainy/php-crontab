@@ -94,6 +94,10 @@ class Cron
      */
     private $cronRecord = 'system_crontab_log';
     /**
+     * 定时任务表字段
+     * */
+    private $cronField = 'id,title,type,frequency,shell,running_times,last_running_time,remark,sort,status,op_name,create_time,update_time';
+    /**
      * 定时任务日志表后缀 按月分表
      * @var string|null
      */
