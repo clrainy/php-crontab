@@ -223,7 +223,7 @@ WHERE id = {$id}
      * @param Request $request
      * @return array
      */
-    private function cronIndex($request)
+    public function cronIndex(Request $request)
     {
         list($page, $limit, $where) = $this->buildTableParames($request->get());
         list($whereStr, $bindValues) = $this->parseWhere($where);
@@ -327,37 +327,37 @@ WHERE id = {$id}
         return [$whereStr, $bindValues];
     }
 
-    private function cronCreate()
+    public function cronCreate()
     {
         return ['action' => 'create'];
     }
 
-    private function cronModify()
+    public function cronModify()
     {
         return ['action' => 'modify'];
     }
 
-    private function cronDelete()
+    public function cronDelete()
     {
         return ['action' => 'delete'];
     }
 
-    private function cronReload()
+    public function cronReload()
     {
         return ['action' => 'reload'];
     }
 
-    private function cronLogs()
+    public function cronLogs()
     {
         return ['action' => 'logs'];
     }
 
-    private function cronPool()
+    public function cronPool()
     {
         return ['action' => 'pool'];
     }
 
-    private function cronPing()
+    public function cronPing()
     {
         return ['action' => 'ping'];
     }

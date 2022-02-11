@@ -2,8 +2,6 @@
 
 namespace Cdyun\PhpCrontab\Core;
 
-use Cdyun\PhpRouter\Route;
-
 /**
  * Class RouteTrait
  * @package Cdyun\PhpCrontab\Core
@@ -44,16 +42,14 @@ trait RouteTrait
      * */
     private function registerRoute()
     {
-        Route::get($this->indexPath, [$this, 'cronIndex']);
-        Route::post($this->createPath, [$this, 'cronCreate']);
-        Route::post($this->modifyPath, [$this, 'cronModify']);
-        Route::post($this->deletePath, [$this, 'cronDelete']);
-        Route::post($this->reloadPath, [$this, 'cronReload']);
-        Route::get($this->logsPath, [$this, 'cronLogs']);
-        Route::get($this->poolPath, [$this, 'cronPool']);
-        Route::get($this->pingPath, function() {
-            return 'GET/POST请求';
-        });
+        UseRouter::get($this->indexPath, [$this, 'cronIndex']);
+        UseRouter::post($this->createPath, [$this, 'cronCreate']);
+        UseRouter::post($this->modifyPath, [$this, 'cronModify']);
+        UseRouter::post($this->deletePath, [$this, 'cronDelete']);
+        UseRouter::post($this->reloadPath, [$this, 'cronReload']);
+        UseRouter::get($this->logsPath, [$this, 'cronLogs']);
+        UseRouter::get($this->poolPath, [$this, 'cronPool']);
+        UseRouter::get($this->pingPath, [$this, 'cronPing']);
     }
 
     /**

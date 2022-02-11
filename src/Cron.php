@@ -9,10 +9,12 @@ use Cdyun\PhpCrontab\Core\DbTrait;
 use Cdyun\PhpCrontab\Core\EnvTrait;
 use Cdyun\PhpCrontab\Core\RouteTrait;
 use Cdyun\PhpCrontab\Core\ToolTrait;
+use Cdyun\PhpCrontab\Core\UseRouter;
 use Cdyun\PhpHttp\HttpService;
 use Workerman\Connection\TcpConnection;
 use Workerman\Crontab\Crontab;
 use Workerman\MySQL\Connection;
+use Workerman\Protocols\Http\Request;
 use Workerman\Worker;
 
 /**
@@ -190,7 +192,20 @@ class Cron
      */
     public function onMessage(TcpConnection $connection, $request)
     {
+        if ($request instanceof Request) {
+            if (!is_null($this->safeKey) && $request->header('key') !== $this->safeKey) {
+                $connection->send($this->response('', 'Error SafeKey,Connection Not Allowed!', 403));
+            } else {
+//                var_dump($request->method());
+//                var_dump($request->path());
+//                var_dump($request->get());
+//                var_dump($request->post());
+//                var_dump($request->uri());
+                $connection->send($this->response(UseRouter::dispatch($request->method(), $request->path())));
+            }
+        }
     }
+
 
     /**
      * 当客户端连接与Workerman断开时触发的回调函数
@@ -276,8 +291,8 @@ class Cron
                 $startTime = microtime(true);
                 if ($rs['type'] == 1) {
                     $http = HttpService::getRequest($shell);
-                    $code = $http == false ? 0 : 1;
-                    $output = json_encode(json_decode($http, true), JSON_UNESCAPED_UNICODE);
+                    $code = $http['response_code'] == 200 ? 1 : 0;
+                    $output = json_encode(json_decode($http['response_data'], true), JSON_UNESCAPED_UNICODE);
                 } else {
                     exec($shell, $output, $code);
                     $output = join(PHP_EOL, $output);
