@@ -298,7 +298,7 @@ class Cron
                 $startTime = microtime(true);
                 if ($rs['type'] == 1) {
                     $http = HttpService::getRequest($shell);
-                    $code = $http['response_code'] == 200 ? 1 : 0;
+                    $code = $http['response_code'] == 200 ? 0 : 1;
                     $output = json_encode(json_decode($http['response_data'], true), JSON_UNESCAPED_UNICODE);
                 } else {
                     exec($shell, $output, $code);
