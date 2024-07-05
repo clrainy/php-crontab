@@ -131,7 +131,7 @@ CREATE TABLE IF NOT EXISTS `{$this->cronRecord}`  (
   `sid` int(60) NOT NULL COMMENT '任务id',
   `command` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci NOT NULL COMMENT '执行命令',
   `output` text CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci NOT NULL COMMENT '执行输出',
-  `return_var` tinyint(4) NOT NULL COMMENT '执行返回状态[0成功; 1失败]',
+  `return_var` tinyint(4) NOT NULL COMMENT '执行返回状态[0：成功; 非0：失败]',
   `running_time` varchar(10) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci NOT NULL COMMENT '执行所用时间',
   `create_time` datetime NULL DEFAULT NULL COMMENT '创建时间',
   `update_time` datetime NULL DEFAULT NULL COMMENT '更新时间',
